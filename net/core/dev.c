@@ -5092,6 +5092,7 @@ u32 bpf_prog_run_generic_xdp(struct sk_buff *skb, struct xdp_buff *xdp,
 		__skb_push(skb, mac_len);
 		break;
 	case XDP_PASS:
+	case XDP_CTC:
 		metalen = xdp->data - xdp->data_meta;
 		if (metalen)
 			skb_metadata_set(skb, metalen);
@@ -5157,6 +5158,7 @@ static u32 netif_receive_generic_xdp(struct sk_buff **pskb,
 	case XDP_REDIRECT:
 	case XDP_TX:
 	case XDP_PASS:
+	case XDP_CTC:
 		break;
 	default:
 		bpf_warn_invalid_xdp_action((*pskb)->dev, xdp_prog, act);
@@ -5225,6 +5227,11 @@ int do_xdp_generic(struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 				break;
 			case XDP_TX:
 				generic_xdp_tx(*pskb, xdp_prog);
+				break;
+			case XDP_CTC:
+				printk(KERN_DEBUG "XDP_CTC match but not supported. Return as XDP_PASS\n");
+				bpf_net_ctx_clear(bpf_net_ctx);
+				return XDP_PASS;
 				break;
 			}
 			bpf_net_ctx_clear(bpf_net_ctx);
