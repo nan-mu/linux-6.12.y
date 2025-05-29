@@ -1191,6 +1191,13 @@ static void prog_array_map_free(struct bpf_map *map)
 	fd_array_map_free(map);
 }
 
+static long prog_array_map_redirect(struct bpf_map *map, u64 ifindex, u64 flags)
+{
+	printk(KERN_DEBUG "prog_array_map_redirect: ifindex=%llu flags=0x%llx\n",
+	       ifindex, flags);
+	return XDP_CTC;
+}
+
 /* prog_array->aux->{type,jited} is a runtime binding.
  * Doing static check alone in the verifier is not enough.
  * Thus, prog_array_map cannot be used as an inner_map
@@ -1213,6 +1220,7 @@ const struct bpf_map_ops prog_array_map_ops = {
 	.map_seq_show_elem = prog_array_map_seq_show_elem,
 	.map_mem_usage = array_map_mem_usage,
 	.map_btf_id = &array_map_btf_ids[0],
+	.map_redirect = prog_array_map_redirect,
 };
 
 static struct bpf_event_entry *bpf_event_entry_gen(struct file *perf_file,
