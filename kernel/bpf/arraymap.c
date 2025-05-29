@@ -1193,8 +1193,34 @@ static void prog_array_map_free(struct bpf_map *map)
 
 static long prog_array_map_redirect(struct bpf_map *map, u64 ifindex, u64 flags)
 {
-	printk(KERN_DEBUG "prog_array_map_redirect: ifindex=%llu flags=0x%llx\n",
-	       ifindex, flags);
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
+	struct bpf_prog *prog;
+	const u64 action_mask = XDP_ABORTED | XDP_DROP | XDP_PASS | XDP_TX;
+
+	if (unlikely(ifindex >= array->map.max_entries)){
+		printk(KERN_DEBUG "bad prog array redirect: ifindex %llu >= max_entries %u",
+		       ifindex, array->map.max_entries);
+		return XDP_ABORTED;
+	}
+
+	prog = READ_ONCE(array->ptrs[ifindex]);
+	if (!prog){
+		ri->map_id = INT_MAX; /* Valid map id idr range: [1,INT_MAX[ */
+		ri->map_type = BPF_MAP_TYPE_UNSPEC;
+		printk(KERN_DEBUG "bad prog array redirect: no prog at index %llu",
+		       ifindex);
+		return XDP_ABORTED;
+	}
+
+	ri->tgt_value = prog;
+	ri->tgt_index = ifindex;
+	ri->map_id = map->id;
+	ri->map_type = map->map_type;
+
+	printk(KERN_DEBUG "ri write completed, map_id %d, map_type %d, ifindex %llu",
+	       ri->map_id, ri->map_type, ifindex);
+
 	return XDP_CTC;
 }
 

@@ -5204,6 +5204,24 @@ void generic_xdp_tx(struct sk_buff *skb, struct bpf_prog *xdp_prog)
 	}
 }
 
+int generic_xdp_ctc(struct bpf_prog **xdp_prog)
+{
+	struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
+	struct bpf_prog *old_prog = *xdp_prog;
+	enum bpf_map_type map_type = ri->map_type;
+	void *next = ri->tgt_value;
+	u32 map_id = ri->map_id;
+	int err; // TODO: impl _trace_xdp_ctc_err
+
+	if (map_type == BPF_MAP_TYPE_UNSPEC && map_id == INT_MAX)
+		return -EINVAL;
+	
+	// 我应该处理旧xdp_prog吗？
+	*xdp_prog = next;
+	
+	return 0;
+}
+
 static DEFINE_STATIC_KEY_FALSE(generic_xdp_needed_key);
 
 int do_xdp_generic(struct bpf_prog *xdp_prog, struct sk_buff **pskb)
@@ -5229,7 +5247,13 @@ int do_xdp_generic(struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 				generic_xdp_tx(*pskb, xdp_prog);
 				break;
 			case XDP_CTC:
-				printk(KERN_DEBUG "XDP_CTC match but not supported. Return as XDP_PASS\n");
+				printk(KERN_DEBUG "match XDP_CTC\n");
+				printk(KERN_DEBUG "old xdp_prog: %p\n", xdp_prog);
+				err = generic_xdp_ctc(&xdp_prog);
+				if (err)
+					goto out_redir;
+				printk(KERN_DEBUG "new xdp_prog: %p\n", xdp_prog);
+				
 				bpf_net_ctx_clear(bpf_net_ctx);
 				return XDP_PASS;
 				break;
