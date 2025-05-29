@@ -1196,7 +1196,6 @@ static long prog_array_map_redirect(struct bpf_map *map, u64 ifindex, u64 flags)
 	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
 	struct bpf_prog *prog;
-	const u64 action_mask = XDP_ABORTED | XDP_DROP | XDP_PASS | XDP_TX;
 
 	if (unlikely(ifindex >= array->map.max_entries)){
 		printk(KERN_DEBUG "bad prog array redirect: ifindex %llu >= max_entries %u",
