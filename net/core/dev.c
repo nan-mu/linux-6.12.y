@@ -5207,11 +5207,10 @@ void generic_xdp_tx(struct sk_buff *skb, struct bpf_prog *xdp_prog)
 int generic_xdp_ctc(struct bpf_prog **xdp_prog)
 {
 	struct bpf_redirect_info *ri = bpf_net_ctx_get_ri();
-	struct bpf_prog *old_prog = *xdp_prog;
 	enum bpf_map_type map_type = ri->map_type;
 	void *next = ri->tgt_value;
 	u32 map_id = ri->map_id;
-	int err; // TODO: impl _trace_xdp_ctc_err
+	// int err; // TODO: impl _trace_xdp_ctc_err
 
 	if (map_type == BPF_MAP_TYPE_UNSPEC && map_id == INT_MAX)
 		return -EINVAL;
@@ -5227,12 +5226,13 @@ static DEFINE_STATIC_KEY_FALSE(generic_xdp_needed_key);
 int do_xdp_generic(struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 {
 	struct bpf_net_context __bpf_net_ctx, *bpf_net_ctx;
+	struct sk_buff *old_skb;
 
 	if (xdp_prog) {
 		struct xdp_buff xdp;
 		u32 act;
 		int err;
-
+xdp_ctc:
 		bpf_net_ctx = bpf_net_ctx_set(&__bpf_net_ctx);
 		act = netif_receive_generic_xdp(pskb, &xdp, xdp_prog);
 		if (act != XDP_PASS) {
@@ -5245,27 +5245,53 @@ int do_xdp_generic(struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 				break;
 			case XDP_TX:
 				generic_xdp_tx(*pskb, xdp_prog);
+				printk(KERN_DEBUG "a TX success\n");
 				break;
 			case XDP_CTC:
+				if (old_skb) {
+					printk(KERN_DEBUG "child xdp can't use XDP_CTC\n");
+					goto out_redir;
+				}
 				printk(KERN_DEBUG "match XDP_CTC\n");
 				printk(KERN_DEBUG "old xdp_prog: %p\n", xdp_prog);
 				err = generic_xdp_ctc(&xdp_prog);
 				if (err)
 					goto out_redir;
 				printk(KERN_DEBUG "new xdp_prog: %p\n", xdp_prog);
-				
 				bpf_net_ctx_clear(bpf_net_ctx);
-				return XDP_PASS;
+				old_skb = *pskb;
+				printk(KERN_DEBUG "old skb: %p\n", old_skb);
+				*pskb = skb_clone(old_skb, GFP_ATOMIC);
+				printk(KERN_DEBUG "new skb: %p\n", *pskb);
+				if (unlikely(!*pskb))
+					goto out_redir;
+				goto xdp_ctc;
 				break;
+			}
+			if (old_skb) {
+				printk(KERN_DEBUG "old skb: %p\n", old_skb);
+				*pskb = old_skb;
+				return XDP_PASS;
 			}
 			bpf_net_ctx_clear(bpf_net_ctx);
 			return XDP_DROP;
+		} else {
+			/* XDP_PASS */
+			if (old_skb) {
+				printk(KERN_DEBUG "child xdp can't use XDP_PASS: %p\n", old_skb);
+				kfree_skb_reason(old_skb, SKB_DROP_REASON_XDP);
+				*pskb = old_skb;
+			}
 		}
 		bpf_net_ctx_clear(bpf_net_ctx);
 	}
 	return XDP_PASS;
 out_redir:
 	bpf_net_ctx_clear(bpf_net_ctx);
+	if (old_skb && old_skb !=*pskb) {
+		printk(KERN_DEBUG "old skb: %p\n", old_skb);
+		kfree_skb_reason(old_skb, SKB_DROP_REASON_XDP);
+	}
 	kfree_skb_reason(*pskb, SKB_DROP_REASON_XDP);
 	return XDP_DROP;
 }
