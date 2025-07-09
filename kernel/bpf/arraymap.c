@@ -1198,8 +1198,6 @@ static long prog_array_map_redirect(struct bpf_map *map, u64 ifindex, u64 flags)
 	struct bpf_prog *prog;
 
 	if (unlikely(ifindex >= array->map.max_entries)){
-		printk(KERN_DEBUG "bad prog array redirect: ifindex %llu >= max_entries %u",
-		       ifindex, array->map.max_entries);
 		return XDP_ABORTED;
 	}
 
@@ -1207,8 +1205,6 @@ static long prog_array_map_redirect(struct bpf_map *map, u64 ifindex, u64 flags)
 	if (!prog){
 		ri->map_id = INT_MAX; /* Valid map id idr range: [1,INT_MAX[ */
 		ri->map_type = BPF_MAP_TYPE_UNSPEC;
-		printk(KERN_DEBUG "bad prog array redirect: no prog at index %llu",
-		       ifindex);
 		return XDP_ABORTED;
 	}
 
@@ -1216,9 +1212,6 @@ static long prog_array_map_redirect(struct bpf_map *map, u64 ifindex, u64 flags)
 	ri->tgt_index = ifindex;
 	ri->map_id = map->id;
 	ri->map_type = map->map_type;
-
-	printk(KERN_DEBUG "ri write completed, map_id %d, map_type %d, ifindex %llu",
-	       ri->map_id, ri->map_type, ifindex);
 
 	return XDP_CTC;
 }

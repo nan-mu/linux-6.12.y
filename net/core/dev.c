@@ -5245,31 +5245,23 @@ xdp_ctc:
 				break;
 			case XDP_TX:
 				generic_xdp_tx(*pskb, xdp_prog);
-				printk(KERN_DEBUG "a TX success\n");
 				break;
 			case XDP_CTC:
 				if (old_skb) {
-					printk(KERN_DEBUG "child xdp can't use XDP_CTC\n");
 					goto out_redir;
 				}
-				printk(KERN_DEBUG "match XDP_CTC\n");
-				printk(KERN_DEBUG "old xdp_prog: %p\n", xdp_prog);
 				err = generic_xdp_ctc(&xdp_prog);
 				if (err)
 					goto out_redir;
-				printk(KERN_DEBUG "new xdp_prog: %p\n", xdp_prog);
 				bpf_net_ctx_clear(bpf_net_ctx);
 				old_skb = *pskb;
-				printk(KERN_DEBUG "old skb: %p\n", old_skb);
 				*pskb = skb_clone(old_skb, GFP_ATOMIC);
-				printk(KERN_DEBUG "new skb: %p\n", *pskb);
 				if (unlikely(!*pskb))
 					goto out_redir;
 				goto xdp_ctc;
 				break;
 			}
 			if (old_skb) {
-				printk(KERN_DEBUG "old skb: %p\n", old_skb);
 				*pskb = old_skb;
 				return XDP_PASS;
 			}
@@ -5278,7 +5270,6 @@ xdp_ctc:
 		} else {
 			/* XDP_PASS */
 			if (old_skb) {
-				printk(KERN_DEBUG "child xdp can't use XDP_PASS: %p\n", old_skb);
 				kfree_skb_reason(old_skb, SKB_DROP_REASON_XDP);
 				*pskb = old_skb;
 			}
@@ -5289,7 +5280,6 @@ xdp_ctc:
 out_redir:
 	bpf_net_ctx_clear(bpf_net_ctx);
 	if (old_skb && old_skb !=*pskb) {
-		printk(KERN_DEBUG "old skb: %p\n", old_skb);
 		kfree_skb_reason(old_skb, SKB_DROP_REASON_XDP);
 	}
 	kfree_skb_reason(*pskb, SKB_DROP_REASON_XDP);
